@@ -33,7 +33,7 @@ jobs:
       - run: flutter pub get
 
       # OJO: base-href debe coincidir con el nombre del repositorio.
-      - run: flutter build web --release --base-href "/solarscan/"
+      - run: flutter build web --release --base-href "/solar-scan/"
 
       - uses: actions/upload-pages-artifact@v3
         with:
