@@ -1,0 +1,72 @@
+---
+name: Feature / Ticket
+about: Historia implementable con criterios de aceptación
+title: "[F1] "
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: fase
+    attributes:
+      label: Fase
+      options:
+        - "Fase 1 — Credibilidad técnica"
+        - "Fase 2 — Cierre comercial"
+        - "Fase 3 — Plataforma B2B"
+        - "Fase 4 — Ecosistema"
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioridad
+      options:
+        - "P0 — Crítico"
+        - "P1 — Alto"
+        - "P2 — Medio"
+        - "P3 — Bajo"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - "area:medicion"
+        - "area:diseño"
+        - "area:ventas"
+        - "area:plataforma"
+        - "area:datos"
+        - "area:ops"
+    validations:
+      required: true
+  - type: input
+    id: epic
+    attributes:
+      label: Épica padre
+      description: "Issue # de la épica (ej. #2)"
+  - type: textarea
+    id: user_story
+    attributes:
+      label: User story
+      value: |
+        Como instalador,
+        quiero ...,
+        para ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      value: |
+        - [ ] ...
+        - [ ] ...
+        - [ ] Tests en lib/domain/ si aplica
+    validations:
+      required: true
+  - type: textarea
+    id: technical
+    attributes:
+      label: Notas técnicas
+      description: Archivos, módulos domain/, dependencias

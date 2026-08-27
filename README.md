@@ -129,21 +129,27 @@ Flujo completo: **Proyectos → Cliente → Medir → Diseñar → Números → 
 
 ```
 lib/
-├── main.dart           App + inyección del estado
-├── core.dart           Tokens de diseño (light glass) y widgets base
-├── models.dart         Project, RoofFacet, Obstacle, PanelModule, resultados
-├── services.dart       Motor de cálculo — SIN dependencias de Flutter
-│                       · Geo      área, proyección al plano del techo
-│                       · Solar    posición solar, transposición al plano inclinado
-│                       · Production  kWh/mes con derrateo térmico
-│                       · PanelLayout empaquetado de módulos
-│                       · Finance  payback, VPN, TIR
-├── painters.dart       Estado global + CustomPainters (techo, casa 3D, barras)
-├── proposal_pdf.dart   Generación del PDF en el dispositivo
+├── catalog/            Equipos (inversores, baterías)
+├── domain/             Motor de cálculo — SIN Flutter
+│   ├── geo.dart        área, proyección al plano del techo
+│   ├── solar.dart      posición solar, transposición al plano inclinado
+│   ├── production.dart kWh/mes con derrateo térmico
+│   ├── layout.dart     empaquetado de módulos
+│   ├── finance.dart    payback, VPN, TIR
+│   ├── area_capture.dart  rectángulo + área objetivo
+│   ├── sizing.dart     sugerencias desde consumo
+│   ├── solar_site.dart perfiles regionales
+│   └── system_quote.dart BOM y cotización
+├── widgets/            UI reutilizable (BOM, supuestos, etc.)
+├── services.dart       Barrel export del domain
+├── painters.dart       Estado global + CustomPainters
+├── proposal_pdf.dart   PDF en el dispositivo
 └── screens/            Una pantalla por paso del flujo
 ```
 
-`services.dart` no importa Flutter: se puede probar con `dart test` sin emulador.
+Ver también: [docs/PROCESS.md](docs/PROCESS.md) · [docs/PRODUCT_BACKLOG.md](docs/PRODUCT_BACKLOG.md)
+
+`domain/` no importa Flutter: se puede probar con `dart test` sin emulador.
 
 ### Tres decisiones que cambian los resultados
 

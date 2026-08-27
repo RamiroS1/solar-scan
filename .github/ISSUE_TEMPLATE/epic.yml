@@ -1,0 +1,57 @@
+---
+name: Épica
+about: Capability de negocio completa (agrupa varios tickets)
+title: "[Epic] "
+labels:
+  - epic
+  - enhancement
+body:
+  - type: dropdown
+    id: fase
+    attributes:
+      label: Fase
+      options:
+        - "Fase 1 — Credibilidad técnica"
+        - "Fase 2 — Cierre comercial"
+        - "Fase 3 — Plataforma B2B"
+        - "Fase 4 — Ecosistema"
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Prioridad
+      options:
+        - "P0 — Crítico"
+        - "P1 — Alto"
+        - "P2 — Medio"
+        - "P3 — Bajo"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problema
+      description: Qué dolor resuelve esta épica
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Resultado esperado
+      description: Qué puede hacer el usuario cuando esté completa
+    validations:
+      required: true
+  - type: textarea
+    id: tickets
+    attributes:
+      label: Tickets hijos
+      description: Lista de issues relacionados (se llenan después de crearlos)
+      value: |
+        - [ ] #...
+        - [ ] #...
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notas técnicas
+      description: Módulos de domain/ afectados, dependencias, riesgos
