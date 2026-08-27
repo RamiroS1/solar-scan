@@ -4,6 +4,7 @@ import '../core.dart';
 import '../models.dart';
 import '../painters.dart';
 import '../services.dart';
+import '../widgets/proposal_sections.dart';
 import 'proposal.dart';
 
 class NumbersScreen extends StatefulWidget {
@@ -50,9 +51,10 @@ class _NumbersScreenState extends State<NumbersScreen> {
 
     final prod = Production.estimate(p);
     final fin = Finance.analyze(
-        annualKwh: prod.annual, kwp: p.kwp, i: p.finance);
+        annualKwh: prod.annual, kwp: p.kwp, i: p.finance, project: p);
     final cur = p.finance.currency;
     final monthlyConsumption = p.annualConsumptionKwh / 12;
+    final breakdown = fin.breakdown ?? SystemQuote.buildBreakdown(p);
 
     return Ambient(
       child: Scaffold(
@@ -142,6 +144,13 @@ class _NumbersScreenState extends State<NumbersScreen> {
                           }),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: 10),
+                    CalculationAssumptionsSection(project: p),
+                    const SizedBox(height: 10),
+                    InvestmentBreakdownSection(
+                      breakdown: breakdown,
+                      currency: cur,
                     ),
                     const SizedBox(height: 10),
                     Glass(

@@ -3,13 +3,13 @@ import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import 'domain/solar_site.dart';
+import 'domain/system_quote.dart';
 import 'models.dart';
 import 'services.dart';
 
 const _months = ['E', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
 
-/// La propuesta se genera en el dispositivo: el tecnico puede cerrar la venta
-/// en el techo, sin conexion.
 Future<Uint8List> buildProposalPdf({
   required Project project,
   required ProductionResult production,
@@ -28,6 +28,17 @@ Future<Uint8List> buildProposalPdf({
   final totalArea =
       project.facets.fold<double>(0, (a, f) => a + Geo.facetArea(f));
   final usedArea = project.panels.length * project.module.areaM2;
+  final bom = SystemQuote.buildBom(project);
+  final breakdown =
+      financial.breakdown ?? SystemQuote.buildBreakdown(project);
+  final inv = SystemQuote.resolveInverter(project);
+  final site = project.solarSite ??
+      SolarSiteResolver.resolve(address: project.address);
+  final hints = ProjectFinanceHints(
+    selfConsumption: project.finance.selfConsumption,
+    degradation: project.finance.degradation,
+  );
+  final assumptions = SolarSiteResolver.assumptionLines(site, hints);
 
   doc.addPage(
     pw.MultiPage(
@@ -70,11 +81,15 @@ Future<Uint8List> buildProposalPdf({
         pw.SizedBox(height: 4),
         pw.Text('${project.customer}   ·   ${project.address}',
             style: const pw.TextStyle(fontSize: 11, color: PdfColors.grey700)),
+        if (project.phone.isNotEmpty)
+          pw.Text('Tel: ${project.phone}',
+              style:
+                  const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
         pw.SizedBox(height: 18),
         pw.Row(children: [
-          _kpi('Potencia', '${project.kwp.toStringAsFixed(2)} kWp', accent),
-          _kpi('Paneles', '${project.panels.length}', accent),
+          _kpi('Potencia (kWp)', '${project.kwp.toStringAsFixed(2)} kWp', accent),
           _kpi('Produccion', '${production.annual.round()} kWh/ano', accent),
+          _kpi('Paneles', '${project.panels.length}', accent),
           _kpi(
               'Retorno',
               financial.payback >= 0
@@ -83,20 +98,60 @@ Future<Uint8List> buildProposalPdf({
               accent),
         ]),
         pw.SizedBox(height: 20),
+        _title('Que incluye tu sistema', primary),
+        _table(bom
+            .map((b) => [
+                  b.category,
+                  b.included
+                      ? '${b.description} (${b.quantity})'
+                      : b.description,
+                ])
+            .toList()),
+        pw.SizedBox(height: 18),
         _title('Resumen tecnico', primary),
         _table([
           ['Modulo', project.module.name],
           ['Potencia por modulo', '${project.module.wp.round()} Wp'],
           ['Cantidad de modulos', '${project.panels.length}'],
-          ['Potencia instalada', '${project.kwp.toStringAsFixed(2)} kWp'],
+          ['Potencia instalada (kWp)', '${project.kwp.toStringAsFixed(2)} kWp'],
+          [
+            'Inversor propuesto',
+            '${inv.name} (${inv.acKw.toStringAsFixed(1)} kW AC)',
+          ],
+          if (project.system.includeBattery)
+            [
+              'Bateria',
+              project.system.battery?.name ?? 'Incluida',
+            ],
           ['Superficies medidas', '${project.facets.length}'],
           ['Area de techo', '${totalArea.toStringAsFixed(1)} m2'],
-          ['Area ocupada', '${usedArea.toStringAsFixed(1)} m2'],
+          ['Area ocupada por modulos', '${usedArea.toStringAsFixed(1)} m2'],
+          if (project.targetAreaM2 != null)
+            ['Area objetivo', '${project.targetAreaM2!.toStringAsFixed(0)} m2'],
           [
             'Rendimiento especifico',
             '${production.specificYield.round()} kWh/kWp/ano'
           ],
+          [
+            'Distribucion',
+            '${project.panels.length} modulos sobre ${usedArea.toStringAsFixed(1)} m2',
+          ],
         ]),
+        pw.SizedBox(height: 18),
+        _title('Desglose de inversion', primary),
+        _table([
+          ...breakdown.lines.map((l) => [
+                l.detail != null ? '${l.label} (${l.detail})' : l.label,
+                '$cur${money(l.amount)}',
+              ]),
+          ['Total', '$cur${money(breakdown.total)}'],
+        ]),
+        pw.SizedBox(height: 18),
+        _title('Supuestos del calculo', primary),
+        _table(assumptions.map((a) {
+          final parts = a.split(': ');
+          return parts.length > 1 ? [parts.first, parts.sublist(1).join(': ')] : [a, ''];
+        }).toList()),
         pw.SizedBox(height: 18),
         _title('Produccion estimada por mes', primary),
         _bars(production.monthly, primary),
@@ -111,7 +166,7 @@ Future<Uint8List> buildProposalPdf({
         pw.SizedBox(height: 18),
         _title('Analisis economico', primary),
         _table([
-          ['Inversion', '$cur${money(financial.capex)}'],
+          ['Inversion total', '$cur${money(financial.capex)}'],
           [
             'Tarifa considerada',
             '$cur${project.finance.tariffPerKwh.toStringAsFixed(2)} / kWh'
@@ -141,9 +196,9 @@ Future<Uint8List> buildProposalPdf({
         ]),
         pw.SizedBox(height: 20),
         pw.Text(
-          'Estimacion basada en datos de irradiancia y en las condiciones '
-          'declaradas por el cliente. La produccion real puede variar segun '
-          'clima, sombreado y habitos de consumo.',
+          'kWp = potencia del hardware. kWh/ano = produccion estimada segun '
+          'irradiancia regional. Estimacion basada en condiciones declaradas; '
+          'la produccion real puede variar por clima, sombreado y habitos.',
           style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600),
         ),
       ],

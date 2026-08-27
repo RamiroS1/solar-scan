@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core.dart';
+import '../domain/sizing.dart';
+import '../domain/solar_site.dart';
 import '../models.dart';
 import '../painters.dart';
 import 'capture.dart';
@@ -304,10 +306,17 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                                 color: T.volt,
                                 borderRadius: BorderRadius.circular(9))),
                         const SizedBox(width: 11),
-                        const Expanded(
+                        Expanded(
                           child: Text(
-                            'Los datos solares del sitio quedan disponibles sin conexion.',
-                            style: TextStyle(fontSize: 11.5, color: T.ink70),
+                            SizingHints.consumptionHint(Project(
+                              id: 'hint',
+                              customer: _customer.text,
+                              annualConsumptionKwh: double.tryParse(
+                                      _consumption.text) ??
+                                  18576,
+                            )),
+                            style: const TextStyle(
+                                fontSize: 11.5, color: T.ink70),
                           ),
                         ),
                       ]),
@@ -333,6 +342,13 @@ class _NewProjectScreenState extends State<NewProjectScreen> {
                     p.finance.tariffPerKwh =
                         double.tryParse(_tariff.text.replaceAll(',', '.')) ??
                             96.4;
+                    p.solarSite = SolarSiteResolver.resolve(
+                      address: p.address,
+                      latitude: p.latitude,
+                      longitude: p.longitude,
+                    );
+                    p.targetAreaM2 =
+                        SizingHints.suggestedAreaForProject(p).roundToDouble();
                     state.create(p);
                     Navigator.of(context).pushReplacement(MaterialPageRoute(
                         builder: (_) => const CaptureScreen()));

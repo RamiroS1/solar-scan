@@ -5,7 +5,9 @@ import 'package:flutter/material.dart';
 import '../core.dart';
 import '../models.dart';
 import '../painters.dart';
+import '../domain/area_capture.dart';
 import '../services.dart';
+import '../widgets/proposal_sections.dart';
 import 'numbers.dart';
 
 class DesignScreen extends StatefulWidget {
@@ -185,6 +187,15 @@ class _DesignScreenState extends State<DesignScreen> {
                       KV('Area bruta', '${gross.toStringAsFixed(1)} m\u00B2'),
                       KV('Area util', '${usable.toStringAsFixed(1)} m\u00B2',
                           color: T.volt),
+                      if (p.targetAreaM2 != null) ...[
+                        const SizedBox(height: 8),
+                        AreaTargetBanner(
+                          feedback: AreaCapture.evaluate(
+                            currentSlopedM2: gross,
+                            targetSlopedM2: p.targetAreaM2,
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       Primary(
                         label: 'Ver produccion',

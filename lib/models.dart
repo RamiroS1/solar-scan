@@ -1,10 +1,16 @@
 import 'dart:ui';
 
+import 'catalog/equipment.dart';
+import 'domain/solar_site.dart';
+
 enum ProjectStatus { draft, sent, approved, installed }
 
 enum PanelOrientation { portrait, landscape }
 
 enum CaptureMode { lidar, photogrammetry, satellite }
+
+/// Modo de captura del contorno del techo.
+enum RoofDrawMode { freehand, rectangle }
 
 class PanelModule {
   final String id;
@@ -139,6 +145,35 @@ class ProductionResult {
   const ProductionResult(this.monthly, this.annual, this.specificYield);
 }
 
+/// Linea del desglose economico.
+class QuoteLine {
+  final String label;
+  final double amount;
+  final String? detail;
+  const QuoteLine(this.label, this.amount, {this.detail});
+}
+
+/// Desglose completo de la inversion.
+class QuoteBreakdown {
+  final List<QuoteLine> lines;
+  final double total;
+  const QuoteBreakdown({required this.lines, required this.total});
+}
+
+/// Item del BOM (lista de materiales).
+class BomLineItem {
+  final String category;
+  final String description;
+  final String quantity;
+  final bool included;
+  const BomLineItem({
+    required this.category,
+    required this.description,
+    required this.quantity,
+    this.included = true,
+  });
+}
+
 class FinancialResult {
   final double capex;
   final double firstYear;
@@ -147,6 +182,7 @@ class FinancialResult {
   final double npv;
   final double? irr;
   final List<double> cumulativeFlow;
+  final QuoteBreakdown? breakdown;
   const FinancialResult({
     required this.capex,
     required this.firstYear,
@@ -155,7 +191,51 @@ class FinancialResult {
     required this.npv,
     required this.irr,
     required this.cumulativeFlow,
+    this.breakdown,
   });
+}
+
+/// Participacion de cada rubro sobre el costo base (costPerWp x kWp).
+class PricingShares {
+  final double panelShare;
+  final double inverterShare;
+  final double mountingShare;
+  final double laborShare;
+  final double permitsShare;
+  final double monitoringShare;
+
+  const PricingShares({
+    this.panelShare = 0.52,
+    this.inverterShare = 0.14,
+    this.mountingShare = 0.12,
+    this.laborShare = 0.16,
+    this.permitsShare = 0.04,
+    this.monitoringShare = 0.02,
+  });
+}
+
+/// Configuracion del sistema contratado (equipos y opciones).
+class SystemConfiguration {
+  bool includeBattery;
+  String? batteryId;
+  String? inverterId;
+  PricingShares pricing;
+
+  SystemConfiguration({
+    this.includeBattery = false,
+    this.batteryId,
+    this.inverterId,
+    this.pricing = const PricingShares(),
+  });
+
+  BatteryPack? get battery {
+    if (!includeBattery) return null;
+    final id = batteryId ?? BatteryPack.catalog.first.id;
+    return BatteryPack.catalog.firstWhere(
+      (b) => b.id == id,
+      orElse: () => BatteryPack.catalog.first,
+    );
+  }
 }
 
 class Project {
@@ -174,6 +254,14 @@ class Project {
   DateTime createdAt;
   /// Escena 3D que se le muestra al cliente: casa, edificio, parqueadero o barrio.
   int archetypeIndex;
+  /// Area REAL objetivo en m² (opcional).
+  double? targetAreaM2;
+  /// Modo preferido de captura del contorno.
+  RoofDrawMode drawMode;
+  /// Equipos y opciones del sistema a contratar.
+  SystemConfiguration system;
+  /// Perfil solar del sitio (resuelto al crear el proyecto).
+  SolarSiteProfile? solarSite;
 
   Project({
     required this.id,
@@ -190,9 +278,14 @@ class Project {
     FinancialInputs? finance,
     DateTime? createdAt,
     this.archetypeIndex = 0,
+    this.targetAreaM2,
+    this.drawMode = RoofDrawMode.rectangle,
+    SystemConfiguration? system,
+    this.solarSite,
   })  : facets = facets ?? [],
         panels = panels ?? [],
         finance = finance ?? FinancialInputs(),
+        system = system ?? SystemConfiguration(),
         createdAt = createdAt ?? DateTime.now();
 
   double get kwp => panels.length * module.wp / 1000.0;
