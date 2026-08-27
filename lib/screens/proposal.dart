@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
 import '../core.dart';
+import '../domain/sizing.dart';
+import '../domain/system_quote.dart';
 import '../models.dart';
 import '../painters.dart';
 import '../proposal_pdf.dart';
 import '../scene3d/scene_model.dart';
 import '../scene3d/scene_view.dart';
 import '../services.dart';
+import '../widgets/proposal_sections.dart';
 
 class ProposalScreen extends StatefulWidget {
   const ProposalScreen({super.key});
@@ -29,6 +32,8 @@ class _ProposalScreenState extends State<ProposalScreen> {
           bytes: bytes,
           filename:
               'propuesta_${p.customer.replaceAll(RegExp(r'\W+'), '_')}.pdf');
+      p.status = ProjectStatus.sent;
+      Store.of(context).touch();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -41,24 +46,21 @@ class _ProposalScreenState extends State<ProposalScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final p = Store.of(context).current;
+    final state = Store.of(context);
+    final p = state.current;
     if (p == null) return const Scaffold(body: SizedBox());
 
     final prod = Production.estimate(p);
-    final fin =
-        Finance.analyze(annualKwh: prod.annual, kwp: p.kwp, i: p.finance);
+    final fin = Finance.analyze(
+        annualKwh: prod.annual, kwp: p.kwp, i: p.finance, project: p);
     final cur = p.finance.currency;
+    final breakdown = fin.breakdown ?? SystemQuote.buildBreakdown(p);
+    final inv = SystemQuote.resolveInverter(p);
+    final instant = InstantPowerSimulation.forKwp(p.kwp);
 
-    // reparto instantaneo simulado de un dia claro de marzo
     final archetype =
         Archetype.values[p.archetypeIndex.clamp(0, Archetype.values.length - 1)];
-    // El modelo trae un numero fijo de modulos: solo podemos encender los que
-    // existen. El clonado parametrico levanta este techo mas adelante.
     final shownPanels = p.panels.length.clamp(0, archetype.maxPanels);
-
-    final peak = p.kwp * 0.86;
-    final toHome = peak * 0.37;
-    final toGrid = peak - toHome;
 
     return Ambient(
       child: Scaffold(
@@ -78,9 +80,25 @@ class _ProposalScreenState extends State<ProposalScreen> {
                             fontWeight: FontWeight.w800,
                             letterSpacing: -.6)),
                     Text(
-                        '${p.kwp.toStringAsFixed(2)} kWp · ${p.panels.length} paneles',
+                        '${p.kwp.toStringAsFixed(2)} kWp instalados · '
+                        '${prod.annual.round()} kWh/ano estimados · '
+                        '${p.panels.length} paneles',
                         style: const TextStyle(fontSize: 12, color: T.ink45)),
                     const SizedBox(height: 12),
+                    SystemBomSection(project: p),
+                    const SizedBox(height: 10),
+                    BatteryOptionsSection(
+                      project: p,
+                      onChanged: () => setState(() {}),
+                    ),
+                    const SizedBox(height: 10),
+                    InvestmentBreakdownSection(
+                      breakdown: breakdown,
+                      currency: cur,
+                    ),
+                    const SizedBox(height: 10),
+                    CalculationAssumptionsSection(project: p),
+                    const SizedBox(height: 10),
                     Glass(
                       padding: const EdgeInsets.all(8),
                       radius: 24,
@@ -115,7 +133,7 @@ class _ProposalScreenState extends State<ProposalScreen> {
                                 child: GestureDetector(
                                   onTap: () {
                                     p.archetypeIndex = a.index;
-                                    Store.of(context).touch();
+                                    state.touch();
                                   },
                                   child: Container(
                                     margin:
@@ -203,19 +221,41 @@ class _ProposalScreenState extends State<ProposalScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    Row(children: [
-                      _tile(peak.toStringAsFixed(1), 'kW del sol', T.sun),
-                      const SizedBox(width: 7),
-                      _tile(toHome.toStringAsFixed(1), 'a la casa', T.iris),
-                      const SizedBox(width: 7),
-                      _tile(toGrid.toStringAsFixed(1), 'a la red', T.volt),
-                    ]),
+                    Glass(
+                      padding: const EdgeInsets.all(13),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Label('ilustracion · no contractual'),
+                          const SizedBox(height: 8),
+                          Row(children: [
+                            _tile(instant.peakKw.toStringAsFixed(1),
+                                'kW pico simulado', T.sun),
+                            const SizedBox(width: 7),
+                            _tile(instant.toHomeKw.toStringAsFixed(1),
+                                'a la casa', T.iris),
+                            const SizedBox(width: 7),
+                            _tile(instant.toGridKw.toStringAsFixed(1),
+                                'a la red', T.volt),
+                          ]),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Flujo instantaneo ilustrativo (~${(InstantPowerSimulation.peakFactor * 100).round()} % del kWp). '
+                            'Inversor propuesto: ${inv.name} (${inv.acKw.toStringAsFixed(1)} kW AC).',
+                            style: const TextStyle(
+                                fontSize: 10.5, color: T.ink45, height: 1.3),
+                          ),
+                        ],
+                      ),
+                    ),
                     const SizedBox(height: 10),
                     Glass(
                       child: Column(children: [
-                        KV('Produccion anual',
+                        KV('Potencia instalada (kWp)',
+                            p.kwp.toStringAsFixed(2)),
+                        KV('Produccion anual estimada',
                             '${money(prod.annual)} kWh'),
-                        KV('Inversion', '$cur${money(fin.capex)}'),
+                        KV('Inversion total', '$cur${money(fin.capex)}'),
                         KV(
                             'Retorno',
                             fin.payback >= 0
@@ -224,25 +264,6 @@ class _ProposalScreenState extends State<ProposalScreen> {
                             color: T.volt),
                         KV('Ahorro a 25 anos', '$cur${money(fin.cumulative)}',
                             color: T.go),
-                      ]),
-                    ),
-                    const SizedBox(height: 10),
-                    Glass(
-                      padding: const EdgeInsets.all(13),
-                      child: Row(children: [
-                        Container(
-                            width: 5,
-                            height: 28,
-                            decoration: BoxDecoration(
-                                color: T.sun,
-                                borderRadius: BorderRadius.circular(9))),
-                        const SizedBox(width: 11),
-                        const Expanded(
-                          child: Text(
-                            'Simulacion de un dia promedio. Aun no hay inversor instalado.',
-                            style: TextStyle(fontSize: 11.5, color: T.ink70),
-                          ),
-                        ),
                       ]),
                     ),
                   ],
@@ -277,18 +298,15 @@ class _ProposalScreenState extends State<ProposalScreen> {
   }
 
   Widget _tile(String v, String k, Color c) => Expanded(
-        child: Glass(
-          padding: const EdgeInsets.symmetric(vertical: 11),
-          child: Column(children: [
-            Text(v,
-                style: TextStyle(
-                    fontFamily: T.mono,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: c)),
-            const SizedBox(height: 2),
-            Text(k, style: const TextStyle(fontSize: 9, color: T.ink45)),
-          ]),
-        ),
+        child: Column(children: [
+          Text(v,
+              style: TextStyle(
+                  fontFamily: T.mono,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: c)),
+          const SizedBox(height: 2),
+          Text(k, style: const TextStyle(fontSize: 9, color: T.ink45)),
+        ]),
       );
 }
